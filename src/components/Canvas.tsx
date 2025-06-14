@@ -18,6 +18,13 @@ interface Connection {
   target: string;
 }
 
+interface ConnectionInProgress {
+  isActive: boolean;
+  sourceNodeId: string | null;
+  startPosition: { x: number; y: number } | null;
+  currentPosition: { x: number; y: number } | null;
+}
+
 const getNodeIcon = (type: string) => {
   const icons = {
     trigger: Zap,
@@ -46,6 +53,12 @@ const Canvas = () => {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  const [connectionInProgress, setConnectionInProgress] = useState<ConnectionInProgress>({
+    isActive: false,
+    sourceNodeId: null,
+    startPosition: null,
+    currentPosition: null
+  });
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -75,6 +88,100 @@ const Canvas = () => {
     e.preventDefault();
   }, []);
 
+  const handleConnectorMouseDown = useCallback((e: React.MouseEvent, nodeId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!canvasRef.current) return;
+
+    const rect = canvasRef.current.getBoundingClientRect();
+    const startPosition = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    };
+
+    setConnectionInProgress({
+      isActive: true,
+      sourceNodeId: nodeId,
+      startPosition,
+      currentPosition: startPosition
+    });
+  }, []);
+
+  const handleCanvasMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!connectionInProgress.isActive || !canvasRef.current) return;
+
+    const rect = canvasRef.current.getBoundingClientRect();
+    const currentPosition = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    };
+
+    setConnectionInProgress(prev => ({
+      ...prev,
+      currentPosition
+    }));
+  }, [connectionInProgress.isActive]);
+
+  const handleConnectorMouseUp = useCallback((e: React.MouseEvent, targetNodeId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!connectionInProgress.isActive || !connectionInProgress.sourceNodeId) return;
+
+    // Prevent connecting node to itself
+    if (connectionInProgress.sourceNodeId === targetNodeId) {
+      setConnectionInProgress({
+        isActive: false,
+        sourceNodeId: null,
+        startPosition: null,
+        currentPosition: null
+      });
+      return;
+    }
+
+    // Check if connection already exists
+    const connectionExists = connections.some(conn => 
+      (conn.source === connectionInProgress.sourceNodeId && conn.target === targetNodeId) ||
+      (conn.source === targetNodeId && conn.target === connectionInProgress.sourceNodeId)
+    );
+
+    if (!connectionExists) {
+      const newConnection: Connection = {
+        id: `connection-${Date.now()}`,
+        source: connectionInProgress.sourceNodeId,
+        target: targetNodeId
+      };
+
+      setConnections(prev => [...prev, newConnection]);
+    }
+
+    setConnectionInProgress({
+      isActive: false,
+      sourceNodeId: null,
+      startPosition: null,
+      currentPosition: null
+    });
+  }, [connectionInProgress, connections]);
+
+  const handleCanvasMouseUp = useCallback(() => {
+    if (connectionInProgress.isActive) {
+      setConnectionInProgress({
+        isActive: false,
+        sourceNodeId: null,
+        startPosition: null,
+        currentPosition: null
+      });
+    }
+  }, [connectionInProgress.isActive]);
+
+  const getNodeCenter = (node: Node) => {
+    return {
+      x: node.position.x,
+      y: node.position.y
+    };
+  };
+
   const renderNode = (node: Node) => {
     const Icon = getNodeIcon(node.type);
     const colorClass = getNodeColor(node.type);
@@ -100,13 +207,64 @@ const Canvas = () => {
         <p className="text-xs text-muted-foreground">{node.data.description}</p>
         
         {/* Connection points */}
-        <div className="absolute -left-2 top-1/2 transform -translate-y-1/2">
+        <div 
+          className="absolute -left-2 top-1/2 transform -translate-y-1/2"
+          onMouseDown={(e) => handleConnectorMouseDown(e, node.id)}
+          onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
+        >
           <div className="node-connector" />
         </div>
-        <div className="absolute -right-2 top-1/2 transform -translate-y-1/2">
+        <div 
+          className="absolute -right-2 top-1/2 transform -translate-y-1/2"
+          onMouseDown={(e) => handleConnectorMouseDown(e, node.id)}
+          onMouseUp={(e) => handleConnectorMouseUp(e, node.id)}
+        >
           <div className="node-connector" />
         </div>
       </div>
+    );
+  };
+
+  const renderConnections = () => {
+    return connections.map(connection => {
+      const sourceNode = nodes.find(n => n.id === connection.source);
+      const targetNode = nodes.find(n => n.id === connection.target);
+      
+      if (!sourceNode || !targetNode) return null;
+
+      const sourceCenter = getNodeCenter(sourceNode);
+      const targetCenter = getNodeCenter(targetNode);
+
+      return (
+        <line
+          key={connection.id}
+          x1={sourceCenter.x}
+          y1={sourceCenter.y}
+          x2={targetCenter.x}
+          y2={targetCenter.y}
+          className="connection-line"
+        />
+      );
+    });
+  };
+
+  const renderConnectionInProgress = () => {
+    if (!connectionInProgress.isActive || !connectionInProgress.startPosition || !connectionInProgress.currentPosition) {
+      return null;
+    }
+
+    return (
+      <line
+        x1={connectionInProgress.startPosition.x}
+        y1={connectionInProgress.startPosition.y}
+        x2={connectionInProgress.currentPosition.x}
+        y2={connectionInProgress.currentPosition.y}
+        stroke="url(#gradient)"
+        strokeWidth={2}
+        strokeDasharray="5,5"
+        fill="none"
+        opacity={0.7}
+      />
     );
   };
 
@@ -117,6 +275,8 @@ const Canvas = () => {
         className="w-full h-full relative glass-card rounded-xl border border-white/10"
         onDrop={handleDrop}
         onDragOver={handleDragOver}
+        onMouseMove={handleCanvasMouseMove}
+        onMouseUp={handleCanvasMouseUp}
         style={{
           backgroundImage: `
             radial-gradient(circle at 25% 25%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
@@ -148,6 +308,8 @@ const Canvas = () => {
               <stop offset="100%" stopColor="#06B6D4" />
             </linearGradient>
           </defs>
+          {renderConnections()}
+          {renderConnectionInProgress()}
         </svg>
 
         {/* Render nodes */}
