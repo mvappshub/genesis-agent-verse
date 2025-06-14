@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,6 +62,14 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				ai: {
+					purple: '#8B5CF6',
+					blue: '#3B82F6',
+					cyan: '#06B6D4',
+					pink: '#EC4899',
+					dark: '#0F0F23',
+					'dark-secondary': '#1A1A2E'
 				}
 			},
 			borderRadius: {
@@ -84,11 +93,34 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				'pulse-glow': {
+					'0%, 100%': {
+						boxShadow: '0 0 20px rgba(139, 92, 246, 0.3)'
+					},
+					'50%': {
+						boxShadow: '0 0 30px rgba(139, 92, 246, 0.6)'
+					}
+				},
+				'flow': {
+					'0%': {
+						transform: 'translateX(-100%)'
+					},
+					'100%': {
+						transform: 'translateX(100%)'
+					}
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'pulse-glow': 'pulse-glow 2s ease-in-out infinite',
+				'flow': 'flow 3s ease-in-out infinite'
+			},
+			backgroundImage: {
+				'gradient-ai': 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+				'gradient-node': 'linear-gradient(135deg, #8B5CF6 0%, #3B82F6 50%, #06B6D4 100%)',
+				'gradient-dark': 'linear-gradient(135deg, #0F0F23 0%, #1A1A2E 100%)'
 			}
 		}
 	},
